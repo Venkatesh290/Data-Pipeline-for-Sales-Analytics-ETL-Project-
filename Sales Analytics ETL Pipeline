@@ -1,0 +1,436 @@
+A comprehensive ETL pipeline for sales data processing and analytics built with Python, Apache Airflow, and PostgreSQL.
+
+## Features
+
+- 🔄 **Automated Data Pipeline**: Extract data from multiple sources (CRM, E-commerce, POS)
+- 🧹 **Data Quality**: Built-in validation, cleaning, and monitoring
+- 📊 **Analytics Ready**: Dimensional modeling for business intelligence
+- 🚀 **Scalable**: Containerized deployment with Docker
+- 📈 **Monitoring**: Comprehensive logging and alerting
+- 🔧 **Configurable**: Easy configuration management
+
+## Quick Start
+
+### Prerequisites
+- Python 3.8+
+- Docker & Docker Compose
+- PostgreSQL
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/sales-analytics-etl.git
+cd sales-analytics-etl
+```
+
+2. Set up environment:
+```bash
+cp .env.example .env
+# Edit .env with your configurations
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Start services:
+```bash
+docker-compose up -d
+```
+
+5. Initialize database:
+```bash
+python scripts/setup_database.py
+```
+
+### Usage
+
+Run the complete pipeline:
+```bash
+python scripts/run_pipeline.py
+```
+
+Run specific components:
+```bash
+# Extract data
+python -m src.extractors.salesforce_extractor
+
+# Transform data
+python -m src.transformers.data_cleaner
+
+# Load data
+python -m src.loaders.warehouse_loader
+```
+
+## Configuration
+
+Edit `config/config.py` or use environment variables:
+
+```python
+DATABASE_URL = "postgresql://user:pass@localhost:5432/sales_analytics"
+SALESFORCE_API_KEY = "your_api_key"
+SHOPIFY_API_URL = "https://your-shop.myshopify.com/admin/api/2023-01/"
+```
+
+## Data Pipeline Architecture
+
+```
+[Data Sources] → [Extract] → [Transform] → [Load] → [Analytics]
+     ↓              ↓           ↓           ↓          ↓
+  - Salesforce   - APIs     - Clean      - Warehouse - Dashboards
+  - Shopify      - Files    - Validate   - Data Lake - Reports
+  - POS          - DB       - Enrich     - Cache     - Alerts
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- 📧 Email: support@yourcompany.com
+- 📖 Documentation: [docs/](docs/)
+- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/sales-analytics-etl/issues)
+```
+
+---
+
+## requirements.txt
+```
+# Core ETL Framework
+apache-airflow==2.7.2
+pandas==2.1.3
+numpy==1.24.3
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# Data Processing
+great-expectations==0.18.3
+dbt-core==1.6.8
+pydantic==2.5.0
+
+# API Integrations
+requests==2.31.0
+simple-salesforce==1.12.4
+shopify-python-api==12.0.0
+
+# Database & Storage
+redis==5.0.1
+boto3==1.34.0
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# Data Visualization (for notebooks)
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.17.0
+
+# Development & Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.11.0
+flake8==6.1.0
+pre-commit==3.6.0
+
+# Jupyter for analysis
+jupyter==1.0.0
+jupyterlab==4.0.9
+
+# Environment management
+python-dotenv==1.0.0
+```
+
+---
+
+## .env.example
+```bash
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/sales_analytics
+POSTGRES_USER=sales_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=sales_analytics
+
+# API Keys
+SALESFORCE_USERNAME=your_sf_username
+SALESFORCE_PASSWORD=your_sf_password
+SALESFORCE_SECURITY_TOKEN=your_sf_token
+SHOPIFY_API_KEY=your_shopify_key
+SHOPIFY_PASSWORD=your_shopify_password
+SHOPIFY_SHOP_NAME=your-shop-name
+
+# AWS Configuration (if using)
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+AWS_REGION=us-east-1
+S3_BUCKET=your-data-bucket
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Monitoring
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+PROMETHEUS_PORT=9090
+
+# Pipeline Configuration
+ETL_BATCH_SIZE=1000
+DATA_RETENTION_DAYS=365
+LOG_LEVEL=INFO
+ENVIRONMENT=development
+```
+
+---
+
+## docker-compose.yml
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/ddl:/docker-entrypoint-initdb.d
+    networks:
+      - etl_network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - etl_network
+
+  airflow-webserver:
+    build: .
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/dags
+    volumes:
+      - ./dags:/app/dags
+      - ./src:/app/src
+      - ./config:/app/config
+    networks:
+      - etl_network
+
+  airflow-scheduler:
+    build: .
+    command: scheduler
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/dags
+    volumes:
+      - ./dags:/app/dags
+      - ./src:/app/src
+      - ./config:/app/config
+    networks:
+      - etl_network
+
+  etl-pipeline:
+    build: .
+    command: tail -f /dev/null  # Keep container running
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    networks:
+      - etl_network
+
+volumes:
+  postgres_data:
+
+networks:
+  etl_network:
+    driver: bridge
+```
+
+---
+
+## Dockerfile
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Install the package
+RUN pip install -e .
+
+# Create airflow user and initialize database
+RUN airflow users create \
+    --username admin \
+    --firstname Admin \
+    --lastname User \
+    --role Admin \
+    --email admin@example.com \
+    --password admin
+
+EXPOSE 8080
+
+CMD ["python", "scripts/run_pipeline.py"]
+```
+
+---
+
+## setup.py
+```python
+from setuptools import setup, find_packages
+
+setup(
+    name="sales-analytics-etl",
+    version="1.0.0",
+    description="Sales Analytics ETL Pipeline",
+    author="Your Name",
+    author_email="your.email@example.com",
+    packages=find_packages(),
+    install_requires=[
+        "apache-airflow>=2.7.0",
+        "pandas>=2.0.0",
+        "sqlalchemy>=2.0.0",
+        "psycopg2-binary>=2.9.0",
+        "great-expectations>=0.18.0",
+        "requests>=2.31.0",
+    ],
+    python_requires=">=3.8",
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+    ],
+)
+```
+
+---
+
+## .gitignore
+```gitignore
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+airflow-webserver.pid
+
+# Database
+*.db
+*.sqlite3
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Data files (don't commit sensitive data)
+data/
+*.csv
+*.json
+*.parquet
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Airflow
+airflow.cfg
+webserver_config.py
+airflow-webserver.pid
